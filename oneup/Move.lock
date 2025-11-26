@@ -29,6 +29,6 @@ flavor = "one"
 
 [env.testnet]
 chain-id = "1bd5c965"
-original-published-id = "0x56926c9c713be5c1c33faceb9db4f05a92ad550f810ec6461ed6d150ecfb4fab"
-latest-published-id = "0x56926c9c713be5c1c33faceb9db4f05a92ad550f810ec6461ed6d150ecfb4fab"
+original-published-id = "0x48dd2fb3d454993f86665027fcfe971c463c6e614d76c3e19acc1f80d67704a1"
+latest-published-id = "0x48dd2fb3d454993f86665027fcfe971c463c6e614d76c3e19acc1f80d67704a1"
 published-version = "1"

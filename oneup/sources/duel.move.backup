@@ -153,7 +153,6 @@ public fun resolve<T>(
     creator_end_val: u64,
     opponent_start_val: u64,
     opponent_end_val: u64,
-    fee_recipient: address,  // ✅ NEW: Dynamic fee recipient
     clock: &Clock,
     ctx: &mut TxContext
 ) {
@@ -165,34 +164,17 @@ public fun resolve<T>(
     assert!(creator_start_val > 0, E_DIVISION_BY_ZERO);
     assert!(opponent_start_val > 0, E_DIVISION_BY_ZERO);
     
-    // Calculate ROI scores
     let creator_score = ((creator_end_val as u128) * SCALAR) / (creator_start_val as u128);
     let opponent_score = ((opponent_end_val as u128) * SCALAR) / (opponent_start_val as u128);
     
-    // Determine winner
     let winner_addr = if (creator_score > opponent_score) {
         duel.creator
     } else if (opponent_score > creator_score) {
         *option::borrow(&duel.opponent)
     } else {
-        duel.creator  // Tie goes to creator
+        duel.creator
     };
     
-    // ✅ Calculate platform fee (2.5%)
-    let total_pot = balance::value(&duel.wager_coins);
-    let fee_amount = (total_pot * 250) / 10000;
-    
-    // ✅ Split pot into fee + winner payout
-    let fee_balance = balance::split(&mut duel.wager_coins, fee_amount);
-    let winner_balance = balance::withdraw_all(&mut duel.wager_coins);
-    
-    // ✅ Transfer fee to platform
-    transfer::public_transfer(coin::from_balance(fee_balance, ctx), fee_recipient);
-    
-    // ✅ Transfer winnings to winner
-    transfer::public_transfer(coin::from_balance(winner_balance, ctx), winner_addr);
-    
-    // Emit resolution event
     event::emit(DuelResolved {
         duel_id: object::uid_to_inner(&duel.id),
         winner: winner_addr,
@@ -205,7 +187,7 @@ public fun resolve<T>(
     });
     
     duel.status = 2;
+    let pot = balance::withdraw_all(&mut duel.wager_coins);
+    transfer::public_transfer(coin::from_balance(pot, ctx), winner_addr);
 }
-
-
 	
