@@ -75,6 +75,12 @@ export function Arena() {
     enabled: !!duel,
   });
 
+  // Get start balances from duel object
+  const creatorStartBalance = duel?.data?.content ? 
+    BigInt((duel.data.content as unknown as DuelContent).fields.wager_amount) : 0n;
+  const opponentStartBalance = duel?.data?.content ? 
+    BigInt((duel.data.content as unknown as DuelContent).fields.wager_amount) : 0n;
+
   // Update countdown
   useEffect(() => {
     const content = duel?.data?.content as unknown as DuelContent | undefined;
@@ -166,6 +172,8 @@ export function Arena() {
           <DuelChart
             creatorBalance={creatorBalance}
             opponentBalance={opponentBalance}
+            creatorStartBalance={creatorStartBalance}
+            opponentStartBalance={opponentStartBalance}
           />
         )}
 
