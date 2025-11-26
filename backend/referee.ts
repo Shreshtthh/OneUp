@@ -2,9 +2,9 @@ import { SuiClient } from '@onelabs/sui/client';
 import { Transaction } from '@onelabs/sui/transactions';
 import { decodeSuiPrivateKey } from '@onelabs/sui/cryptography';
 import { Ed25519Keypair } from '@onelabs/sui/keypairs/ed25519';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -233,7 +233,7 @@ class Referee {
   private async checkExpiredDuels() {
     const now = Date.now();
     
-    for (const [duelId, duel] of this.activeDuels) {
+    for (const [duelId, duel] of Array.from(this.activeDuels.entries())) {
       if (now >= duel.startTime + duel.duration) {
         console.log(`\n⏰ Resolving ${duelId.slice(0, 10)}...`);
         
@@ -273,10 +273,10 @@ class Referee {
         coinType: this.OCT_TYPE
       });
       
-      return coins.data.reduce((sum, coin) => sum + BigInt(coin.balance), 0n);
+      return coins.data.reduce((sum, coin) => sum + BigInt(coin.balance), BigInt(0));
     } catch (error) {
-      console.error(`Error fetching OCT balance for ${address.slice(0, 8)}:`, error);
-      return 0n;
+      console.error(`❌ Error fetching OCT balance for ${address.slice(0, 8)}:`, error);
+      throw error; // 👈 Don't return 0! Let the caller retry
     }
   }
   
