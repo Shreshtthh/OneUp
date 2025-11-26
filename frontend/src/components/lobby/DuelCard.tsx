@@ -1,4 +1,4 @@
-import { Duel } from '../../types';
+import type { Duel } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
 import { formatAddress, formatOCT, formatTimeRemaining } from '../../lib/utils';
 import { DUEL_STATUS } from '../../lib/constants';

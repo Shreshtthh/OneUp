@@ -1,4 +1,4 @@
-import { Duel } from '../../types';
+import type { Duel } from '../../types';
 import { DuelCard } from './DuelCard';
 import { useCurrentAccount } from '@mysten/dapp-kit';
 
