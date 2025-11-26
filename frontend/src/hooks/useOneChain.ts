@@ -1,7 +1,33 @@
 import { useSuiClient } from '@mysten/dapp-kit';
 import { useQuery } from '@tanstack/react-query';
 import { PACKAGE_ID } from '../lib/constants';
-import { Duel, DuelEvent } from '../types';
+import type { Duel } from '../types';
+
+interface DuelCreatedEvent {
+  duel_id: string;
+  creator: string;
+  wager_amount: string;
+  duration: number;
+}
+
+interface DuelJoinedEvent {
+  duel_id: string;
+  creator: string;
+  opponent: string;
+  start_time: number;
+  duration: number;
+}
+
+interface DuelResolvedEvent {
+  duel_id: string;
+  winner: string;
+  creator_score: number;
+  opponent_score: number;
+  creator_start: number;
+  creator_end: number;
+  opponent_start: number;
+  opponent_end: number;
+}
 
 export function useOneChain() {
   const client = useSuiClient();
@@ -47,7 +73,7 @@ export function useOneChain() {
 
       // Process created events
       events.created.forEach((event) => {
-        const data = event.parsedJson as any;
+        const data = event.parsedJson as DuelCreatedEvent;
         duelsMap.set(data.duel_id, {
           id: data.duel_id,
           creator: data.creator,
@@ -61,7 +87,7 @@ export function useOneChain() {
 
       // Process joined events
       events.joined.forEach((event) => {
-        const data = event.parsedJson as any;
+        const data = event.parsedJson as DuelJoinedEvent;
         const duel = duelsMap.get(data.duel_id);
         if (duel) {
           duel.opponent = data.opponent;
@@ -72,7 +98,7 @@ export function useOneChain() {
 
       // Process resolved events
       events.resolved.forEach((event) => {
-        const data = event.parsedJson as any;
+        const data = event.parsedJson as DuelResolvedEvent;
         const duel = duelsMap.get(data.duel_id);
         if (duel) {
           duel.status = 2;
