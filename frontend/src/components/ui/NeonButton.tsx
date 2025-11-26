@@ -1,4 +1,5 @@
-import { ButtonHTMLAttributes, ReactNode, useState } from 'react';
+import { useState } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
 interface NeonButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
