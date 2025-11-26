@@ -3,11 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   body {
-    @apply bg-cyber-darker text-foreground;
+    @apply bg-cyber-darker text-white;
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -101,15 +98,4 @@
   100% {
     background-position: 50px 50px;
   }
-}
-
-/* OneChain Wallet Styles */
-[data-onelabs-wallet-kit] {
-  --dapp-kit-background: rgba(13, 13, 13, 0.95) !important;
-  --dapp-kit-border: rgba(0, 240, 255, 0.3) !important;
-  --dapp-kit-text: #ffffff !important;
-}
-
-.wallet-modal-overlay {
-  backdrop-filter: blur(8px);
 }
