@@ -1,4 +1,4 @@
-import { useCurrentAccount, useConnectWallet, useDisconnectWallet } from '@mysten/dapp-kit';
+import { useCurrentAccount, useConnectWallet, useDisconnectWallet, useWallets } from '@mysten/dapp-kit';
 import { NeonButton } from '../ui/NeonButton';
 import { formatAddress } from '../../lib/utils';
 
@@ -6,6 +6,7 @@ export function WalletButton() {
   const currentAccount = useCurrentAccount();
   const { mutate: connect } = useConnectWallet();
   const { mutate: disconnect } = useDisconnectWallet();
+  const wallets = useWallets();
 
   if (currentAccount) {
     return (
@@ -29,7 +30,7 @@ export function WalletButton() {
   }
 
   return (
-    <NeonButton onClick={() => connect({ wallet: { name: 'Sui Wallet' } })}>
+    <NeonButton onClick={() => wallets.length > 0 && connect({ wallet: wallets[0] })}>
       Connect Wallet
     </NeonButton>
   );
