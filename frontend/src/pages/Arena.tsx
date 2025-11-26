@@ -10,6 +10,21 @@ import { NeonButton } from '../components/ui/NeonButton';
 import { formatTimeRemaining } from '../lib/utils';
 import { OCT_TYPE } from '../lib/constants';
 
+interface DuelFields {
+  creator: string;
+  opponent: { vec: string[] };
+  wager_amount: string;
+  duration: string;
+  start_time: { vec: number[] };
+  status: number;
+}
+
+interface DuelContent {
+  dataType: 'moveObject';
+  fields: DuelFields;
+  type: string;
+}
+
 export function Arena() {
   const { duelId } = useParams<{ duelId: string }>();
   const navigate = useNavigate();
@@ -34,9 +49,10 @@ export function Arena() {
 
   // Fetch live balances
   const { data: creatorBalance } = useQuery({
-    queryKey: ['balance', duel?.data?.content?.fields?.creator],
+    queryKey: ['balance', duel?.data?.content],
     queryFn: async () => {
-      const creator = (duel?.data?.content as any)?.fields?.creator;
+      const content = duel?.data?.content as unknown as DuelContent | undefined;
+      const creator = content?.dataType === 'moveObject' ? content.fields.creator : undefined;
       if (!creator) return 0n;
       const coins = await client.getCoins({ owner: creator, coinType: OCT_TYPE });
       return coins.data.reduce((sum, coin) => sum + BigInt(coin.balance), 0n);
@@ -46,9 +62,10 @@ export function Arena() {
   });
 
   const { data: opponentBalance } = useQuery({
-    queryKey: ['balance', duel?.data?.content?.fields?.opponent],
+    queryKey: ['balance', duel?.data?.content, 'opponent'],
     queryFn: async () => {
-      const opponent = (duel?.data?.content as any)?.fields?.opponent;
+      const content = duel?.data?.content as unknown as DuelContent | undefined;
+      const opponent = content?.dataType === 'moveObject' ? content.fields.opponent : undefined;
       if (!opponent || !opponent.vec || opponent.vec.length === 0) return 0n;
       const opponentAddress = opponent.vec[0];
       const coins = await client.getCoins({ owner: opponentAddress, coinType: OCT_TYPE });
@@ -60,7 +77,8 @@ export function Arena() {
 
   // Update countdown
   useEffect(() => {
-    const fields = (duel?.data?.content as any)?.fields;
+    const content = duel?.data?.content as unknown as DuelContent | undefined;
+    const fields = content?.dataType === 'moveObject' ? content.fields : undefined;
     if (!fields?.start_time || !fields?.duration) return;
 
     const interval = setInterval(() => {
@@ -93,7 +111,10 @@ export function Arena() {
     );
   }
 
-  const fields = (duel.data.content as any).fields;
+  const content = duel.data.content as unknown as DuelContent;
+  const fields = content.dataType === 'moveObject' ? content.fields : undefined;
+  if (!fields) return null;
+
   const creator = fields.creator;
   const opponent = fields.opponent?.vec?.[0];
   const status = fields.status;

@@ -7,7 +7,7 @@ import { DuelGrid } from '../components/lobby/DuelGrid';
 import { CreateDuelModal } from '../components/lobby/CreateDuelModal';
 import { useOneChain } from '../hooks/useOneChain';
 import { useDuelContract } from '../hooks/useDuelContract';
-import { Duel } from '../types';
+import type { Duel } from '../types';
 import { DUEL_STATUS } from '../lib/constants';
 import toast from 'react-hot-toast';
 
