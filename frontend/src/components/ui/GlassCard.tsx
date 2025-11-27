@@ -4,24 +4,26 @@ import { cn } from '../../lib/utils';
 interface GlassCardProps {
   children: ReactNode;
   className?: string;
-  glowColor?: string;
-  onClick?: () => void;
+  glow?: 'cyan' | 'purple' | 'rose' | 'none';
+  hover?: boolean;
 }
 
-export function GlassCard({ children, className, glowColor, onClick }: GlassCardProps) {
+export function GlassCard({ children, className, glow = 'none', hover = true }: GlassCardProps) {
+  const glowClasses = {
+    cyan: 'shadow-glow-cyan',
+    purple: 'shadow-glow-purple',
+    rose: 'shadow-glow-rose',
+    none: '',
+  };
+
   return (
     <div
-      onClick={onClick}
       className={cn(
-        "backdrop-blur-md rounded-xl border transition-all duration-300 hover:scale-[1.02]",
-        onClick && "cursor-pointer",
+        'glass-card',
+        hover && 'hover:-translate-y-1 hover:shadow-2xl transition-all duration-300',
+        glow !== 'none' && glowClasses[glow],
         className
       )}
-      style={{
-        background: 'rgba(13, 13, 13, 0.7)',
-        borderColor: glowColor || 'rgba(255, 255, 255, 0.1)',
-        boxShadow: glowColor ? `0 0 20px ${glowColor}40` : 'none',
-      }}
     >
       {children}
     </div>

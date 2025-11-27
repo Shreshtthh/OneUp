@@ -10,10 +10,18 @@ interface PlayerCardProps {
 }
 
 export function PlayerCard({ address, label, balance, isCurrentUser, color }: PlayerCardProps) {
+  // Map color to glow prop that GlassCard accepts
+  const getGlow = (colorHex: string): 'cyan' | 'purple' | 'rose' | 'none' => {
+    if (colorHex.includes('00f0ff') || colorHex.includes('cyan') || colorHex.includes('blue')) return 'cyan';
+    if (colorHex.includes('ff00ff') || colorHex.includes('pink') || colorHex.includes('magenta')) return 'purple';
+    if (colorHex.includes('ff0080') || colorHex.includes('rose')) return 'rose';
+    return 'none';
+  };
+
   return (
     <GlassCard
       className="p-6"
-      glowColor={color}
+      glow={getGlow(color)}
     >
       <div className="space-y-4">
         <div className="flex items-center justify-between">

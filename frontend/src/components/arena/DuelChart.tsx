@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, LineSeries } from 'lightweight-charts'; // 👈 Import LineSeries
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { GlassCard } from '../ui/GlassCard';
 
 interface DuelChartProps {
   creatorBalance: bigint;
   opponentBalance: bigint;
-  creatorStartBalance: bigint;  // 👈 NEEDED for ROI calc
-  opponentStartBalance: bigint; // 👈 NEEDED for ROI calc
+  creatorStartBalance: bigint;
+  opponentStartBalance: bigint;
 }
 
 export function DuelChart({ 
@@ -18,6 +18,8 @@ export function DuelChart({
 }: DuelChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  
+  // 👈 Refs now hold the generic series API
   const creatorSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const opponentSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
@@ -26,7 +28,6 @@ export function DuelChart({
     if (start === 0n) return 0;
     const diff = current - start;
     // ROI = (Diff / Start) * 100
-    // Multiply by 100 first to keep precision in BigInt before division, then convert to float
     return Number((diff * 10000n) / start) / 100; 
   };
 
@@ -51,18 +52,18 @@ export function DuelChart({
       },
     });
 
-    // 2. Add Series (Creator = Neon Blue)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const creatorSeries = (chart as any).addLineSeries({
+    // 2. Add Series using the new v5 Syntax
+    // ❌ Old: chart.addLineSeries(...)
+    // ✅ New: chart.addSeries(LineSeries, ...)
+    
+    const creatorSeries = chart.addSeries(LineSeries, {
       color: '#00f0ff', // Neon Blue
       lineWidth: 2,
       title: 'Creator ROI %',
       crosshairMarkerVisible: true,
     });
 
-    // 3. Add Series (Opponent = Neon Pink)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const opponentSeries = (chart as any).addLineSeries({
+    const opponentSeries = chart.addSeries(LineSeries, {
       color: '#ff00ff', // Neon Pink
       lineWidth: 2,
       title: 'Opponent ROI %',
@@ -73,14 +74,14 @@ export function DuelChart({
     creatorSeriesRef.current = creatorSeries;
     opponentSeriesRef.current = opponentSeries;
 
-    // 4. Set Initial Baseline (0%)
-    const now = Math.floor(Date.now() / 1000);
+    // 3. Set Initial Baseline (0%)
+    const now = Math.floor(Date.now() / 1000) as Time;
     const initialRoiCreator = getRoi(creatorBalance, creatorStartBalance);
     const initialRoiOpponent = getRoi(opponentBalance, opponentStartBalance);
 
-    // Initialize with at least one point so it's not empty
-    creatorSeries.setData([{ time: now as Time, value: initialRoiCreator }]);
-    opponentSeries.setData([{ time: now as Time, value: initialRoiOpponent }]);
+    // Initialize with at least one point
+    creatorSeries.setData([{ time: now, value: initialRoiCreator }]);
+    opponentSeries.setData([{ time: now, value: initialRoiOpponent }]);
     
     chart.timeScale().fitContent();
 
@@ -99,16 +100,29 @@ export function DuelChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
-  // 5. Live Updates
+  // 4. Live Updates
+  const lastUpdateRef = useRef<{ time: number; creatorRoi: number; opponentRoi: number } | null>(null);
+
   useEffect(() => {
     if (!creatorSeriesRef.current || !opponentSeriesRef.current) return;
 
-    const time = Math.floor(Date.now() / 1000);
+    const now = Math.floor(Date.now() / 1000);
     const creatorRoi = getRoi(creatorBalance, creatorStartBalance);
     const opponentRoi = getRoi(opponentBalance, opponentStartBalance);
 
-    creatorSeriesRef.current.update({ time: time as Time, value: creatorRoi });
-    opponentSeriesRef.current.update({ time: time as Time, value: opponentRoi });
+    const lastPoint = lastUpdateRef.current;
+    
+    // ✅ FIX: Only add if time is DIFFERENT or value changed significantly
+    if (!lastPoint || 
+        now > lastPoint.time || // Time must increase
+        Math.abs(lastPoint.creatorRoi - creatorRoi) > 0.01 || // Creator value changed >0.01%
+        Math.abs(lastPoint.opponentRoi - opponentRoi) > 0.01) { // Opponent value changed >0.01%
+      
+      creatorSeriesRef.current.update({ time: now as Time, value: creatorRoi });
+      opponentSeriesRef.current.update({ time: now as Time, value: opponentRoi });
+      
+      lastUpdateRef.current = { time: now, creatorRoi, opponentRoi };
+    }
     
   }, [creatorBalance, opponentBalance, creatorStartBalance, opponentStartBalance]);
 

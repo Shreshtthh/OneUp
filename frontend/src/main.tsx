@@ -12,7 +12,7 @@ const queryClient = new QueryClient()
 
 const networks = {
   onechain: {
-    url: 'https://rpc-testnet.onelabs.cc:443',
+    url: 'https://rpc-testnet.onelabs.cc',
   },
 }
 
