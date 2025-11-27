@@ -4,7 +4,7 @@
 
 // NEW Package (contains BOTH duel + mock_dex)
 export const PACKAGE_ID = '0x803fc510b1b66e91e5156d830b0e9673298db26c2cb6aff044b93c96002f8fcf';
-export const DEX_PACKAGE_ID = '0x803fc510b1b66e91e5156d830b0e9673298db26c2cb6aff044b93c96002f8fcf'; // Same!
+export const DEX_PACKAGE_ID = '0x803fc510b1b66e91e5156d830b0e9673298db26c2cb6aff044b93c96002f8fcf'; 
 
 // Storage Objects
 export const ADMIN_CAP_ID = '0x196fe14c0a293bfae5732c3f743f755b5fb73b19b164c287ce3b9bbbf0e2d189';

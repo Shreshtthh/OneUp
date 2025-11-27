@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { GlassCard } from '../ui/GlassCard';
 import { NeonButton } from '../ui/NeonButton';
-import { usePriceOracle } from '../../hooks/usePriceOracle';
 import { useMockDex } from '../../hooks/useMockDex';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { useQuery } from '@tanstack/react-query';
 import { OCT_TYPE, MOCK_USD_TYPE } from '../../lib/constants';
 
-export function TradingPanel() {
+interface TradingPanelProps {
+  octPrice: number;
+  octPriceInCents: number;
+}
+
+export function TradingPanel({ octPrice, octPriceInCents }: TradingPanelProps) {
   const [amount, setAmount] = useState('0.1');
   const [direction, setDirection] = useState<'oct-to-usd' | 'usd-to-oct'>('oct-to-usd');
   const [isSwapping, setIsSwapping] = useState(false);
@@ -15,7 +19,6 @@ export function TradingPanel() {
   const account = useCurrentAccount();
   const client = useSuiClient();
     
-  const { octPrice, octPriceInCents } = usePriceOracle();
   const { swapOctToUsd, swapUsdToOct } = useMockDex();
 
   // Fetch balances for the UI

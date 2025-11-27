@@ -1,18 +1,5 @@
 {
-  "duels": [
-    [
-      "0x8b924231301c793e95612d36df9d0dce1d0cca31c2e0491db932127657b4f721",
-      {
-        "duelId": "0x8b924231301c793e95612d36df9d0dce1d0cca31c2e0491db932127657b4f721",
-        "creator": "0x10f8134aa79e0f4f27e02ff0731c63f7ade2497a953a0fdc07a74f18d1c7e17f",
-        "opponent": "0xe64bb800a4a7436979995e9d761d539df2eb0f57b609625c8cbaeaf5eaf7ce5c",
-        "startTime": 1764272138849,
-        "duration": 300000,
-        "creatorStartBalance": "888865336",
-        "opponentStartBalance": "1046248848"
-      }
-    ]
-  ],
+  "duels": [],
   "processedEvents": [
     "CCccDAwkHedRZ5J13oL37SHj22dghQxYJDFPABzXvqJs0",
     "54xeExK1cUoM9MAGN2RVYTo4uKx5PWzF4LNLPc9HPb9X0",
@@ -23,6 +10,12 @@
     "27jQZMUVfbENp2Gnsh1vgiwjpAcqcTkpKsGPU4RAyXb10",
     "6w2QoG9143h9TMusxqaREovgYxZxpXZEG2oxYhJwGR1N0",
     "7QTS8XJpr7FBkNGA6bdZ8YpGVtY3Tb41Rmfz8GHZ3ohB0",
-    "HD385LurGDMinARJPEaAwdex4WwGhASD9eCEk4Y7PvkA0"
+    "HD385LurGDMinARJPEaAwdex4WwGhASD9eCEk4Y7PvkA0",
+    "J1xmBH1CHAECdjFCT7UtbMxmPFQZHo7fnSd7Y8cKmWbw0",
+    "mZnHHKSun6kNmNWbtHAvuYZznfKwszNntJgwDxX32Rf0",
+    "FjBqPyfwbG9rtmDyWVDrzZyPGwEHcwaQGDZUHYEqRXKD0",
+    "6ez69LWZfwYCLueGUhFXQ8j2hJepnjj6fxYLMx3aiiKW0",
+    "AuZoqcRZXmPke1wfwdzCmz5RvDnS7VVqBxgyiBubCQKX0",
+    "aiMHvYEbS7qWRQncEFqtjcsywhvjHwoSNGbQrktmYbB0"
   ]
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, ColorType, LineSeries } from 'lightweight-charts'; // 👈 Import LineSeries
+import { createChart, ColorType, LineSeries } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { GlassCard } from '../ui/GlassCard';
 
@@ -18,23 +18,21 @@ export function DuelChart({
 }: DuelChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  
-  // 👈 Refs now hold the generic series API
   const creatorSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const opponentSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const lastUpdateRef = useRef<Time>(0 as Time); // ✅ Track last update time
 
   // Helper: Calculate ROI %
   const getRoi = (current: bigint, start: bigint) => {
     if (start === 0n) return 0;
     const diff = current - start;
-    // ROI = (Diff / Start) * 100
     return Number((diff * 10000n) / start) / 100; 
   };
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // 1. Create Chart
+    // Create Chart
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
@@ -52,20 +50,17 @@ export function DuelChart({
       },
     });
 
-    // 2. Add Series using the new v5 Syntax
-    // ❌ Old: chart.addLineSeries(...)
-    // ✅ New: chart.addSeries(LineSeries, ...)
-    
+    // Add Series
     const creatorSeries = chart.addSeries(LineSeries, {
-      color: '#00f0ff', // Neon Blue
-      lineWidth: 2,
+      color: '#4FFFEF', // Ethereal Cyan
+      lineWidth: 3,
       title: 'Creator ROI %',
       crosshairMarkerVisible: true,
     });
 
     const opponentSeries = chart.addSeries(LineSeries, {
-      color: '#ff00ff', // Neon Pink
-      lineWidth: 2,
+      color: '#FF00FF', // Magenta
+      lineWidth: 3,
       title: 'Opponent ROI %',
       crosshairMarkerVisible: true,
     });
@@ -74,12 +69,13 @@ export function DuelChart({
     creatorSeriesRef.current = creatorSeries;
     opponentSeriesRef.current = opponentSeries;
 
-    // 3. Set Initial Baseline (0%)
+    // Set Initial Baseline
     const now = Math.floor(Date.now() / 1000) as Time;
+    lastUpdateRef.current = now;
+
     const initialRoiCreator = getRoi(creatorBalance, creatorStartBalance);
     const initialRoiOpponent = getRoi(opponentBalance, opponentStartBalance);
 
-    // Initialize with at least one point
     creatorSeries.setData([{ time: now, value: initialRoiCreator }]);
     opponentSeries.setData([{ time: now, value: initialRoiOpponent }]);
     
@@ -100,48 +96,53 @@ export function DuelChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
-  // 4. Live Updates
-  const lastUpdateRef = useRef<{ time: number; creatorRoi: number; opponentRoi: number } | null>(null);
-
+  // Live Updates
   useEffect(() => {
     if (!creatorSeriesRef.current || !opponentSeriesRef.current) return;
 
     const now = Math.floor(Date.now() / 1000);
+    
+    // ✅ FIX: Only update if at least 2 seconds have passed
+    if (now <= (lastUpdateRef.current as number) + 1) {
+      return; // Skip update if less than 2 seconds
+    }
+
     const creatorRoi = getRoi(creatorBalance, creatorStartBalance);
     const opponentRoi = getRoi(opponentBalance, opponentStartBalance);
 
-    const lastPoint = lastUpdateRef.current;
+    // Update chart
+    creatorSeriesRef.current.update({ time: now as Time, value: creatorRoi });
+    opponentSeriesRef.current.update({ time: now as Time, value: opponentRoi });
     
-    // ✅ FIX: Only add if time is DIFFERENT or value changed significantly
-    if (!lastPoint || 
-        now > lastPoint.time || // Time must increase
-        Math.abs(lastPoint.creatorRoi - creatorRoi) > 0.01 || // Creator value changed >0.01%
-        Math.abs(lastPoint.opponentRoi - opponentRoi) > 0.01) { // Opponent value changed >0.01%
-      
-      creatorSeriesRef.current.update({ time: now as Time, value: creatorRoi });
-      opponentSeriesRef.current.update({ time: now as Time, value: opponentRoi });
-      
-      lastUpdateRef.current = { time: now, creatorRoi, opponentRoi };
-    }
+    lastUpdateRef.current = now as Time; // ✅ Update last time
     
   }, [creatorBalance, opponentBalance, creatorStartBalance, opponentStartBalance]);
 
+  const currentCreatorRoi = getRoi(creatorBalance, creatorStartBalance);
+  const currentOpponentRoi = getRoi(opponentBalance, opponentStartBalance);
+
   return (
-    <GlassCard className="p-6">
+    <GlassCard className="p-6" glow="cyan">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-bold text-white">Live Performance (ROI %)</h3>
-        <div className="flex gap-4 text-sm">
+        <h3 className="text-xl font-bold text-gradient">Live Performance (ROI %)</h3>
+        <div className="flex gap-6 text-sm">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-neon-blue"></span>
+            <span className="w-3 h-3 rounded-full bg-ethereal-cyan shadow-glow-cyan"></span>
             <span className="text-gray-400">Creator</span>
+            <span className="text-ethereal-cyan font-bold">{currentCreatorRoi.toFixed(2)}%</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-neon-pink"></span>
+            <span className="w-3 h-3 rounded-full bg-[#FF00FF] shadow-glow-purple"></span>
             <span className="text-gray-400">Opponent</span>
+            <span className="text-[#FF00FF] font-bold">{currentOpponentRoi.toFixed(2)}%</span>
           </div>
         </div>
       </div>
-      <div ref={chartContainerRef} className="w-full h-[400px]" />
+      <div ref={chartContainerRef} className="w-full h-[400px] rounded-lg bg-black/20" />
+      
+      <div className="text-center text-gray-500 text-sm mt-4">
+        📊 Chart updates every 2 seconds as portfolio values change
+      </div>
     </GlassCard>
   );
 }

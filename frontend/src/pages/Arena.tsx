@@ -10,6 +10,7 @@ import { DuelChart } from '../components/arena/DuelChart';
 import { PriceChart } from '../components/arena/PriceChart';
 import { formatTimeRemaining, formatAddress, formatOCT } from '../lib/utils';
 import { OCT_TYPE, MOCK_USD_TYPE } from '../lib/constants';
+import { usePriceOracle } from '../hooks/usePriceOracle';
 
 
 export function Arena() {
@@ -18,6 +19,7 @@ export function Arena() {
   const account = useCurrentAccount();
   const client = useSuiClient();
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const { octPrice, octPriceInCents } = usePriceOracle();
 
   // Fetch duel object
   const { data: duel, isLoading } = useQuery({
@@ -36,12 +38,21 @@ export function Arena() {
     enabled: !!duelId,
   });
 
-  const fields = (duel?.data?.content as any)?.fields;
+  const fields = (duel?.data?.content as {
+    fields?: {
+      creator?: string;
+      opponent?: { vec?: string[] } | string;
+      start_time?: { vec?: number[] } | number;
+      duration?: number;
+      status?: number;
+      wager_amount?: string;
+    }
+  })?.fields;
 
   // ✅ Works whether wrapped in Option or not
   const creator = fields?.creator;
-  const opponent = fields?.opponent?.vec?.[0] || fields?.opponent || null;
-  const startTime = fields?.start_time?.vec?.[0] || fields?.start_time || null;
+  const opponent = (fields?.opponent as { vec?: string[] })?.vec?.[0] || (fields?.opponent as string) || null;
+  const startTime = (fields?.start_time as { vec?: number[] })?.vec?.[0] || (fields?.start_time as number) || null;
   const duration = fields?.duration;
   const status = fields?.status ?? 0;
   const wagerAmount = fields?.wager_amount;
@@ -84,7 +95,7 @@ export function Arena() {
 
   const { data: opponentPortfolio } = useQuery({
     queryKey: ['portfolio', opponent],
-    queryFn: () => fetchPortfolio(opponent),
+    queryFn: () => fetchPortfolio(opponent || undefined),
     refetchInterval: 3000,
     enabled: !!opponent,
   });
@@ -205,10 +216,10 @@ export function Arena() {
             {/* Price Feed + Trading Panel Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <PriceChart />
+                <PriceChart octPrice={octPrice} />
               </div>
               <div>
-                <TradingPanel />
+                <TradingPanel octPrice={octPrice} octPriceInCents={octPriceInCents} />
               </div>
             </div>
 

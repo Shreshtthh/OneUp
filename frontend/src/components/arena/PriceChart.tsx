@@ -2,23 +2,31 @@ import { useEffect, useRef } from 'react';
 import { createChart, LineSeries } from 'lightweight-charts';
 import type { IChartApi, Time } from 'lightweight-charts';
 import { GlassCard } from '../ui/GlassCard';
-import { usePriceOracle } from '../../hooks/usePriceOracle';
 
-export function PriceChart() {
+interface PriceChartProps {
+  octPrice: number;
+}
+
+export function PriceChart({ octPrice }: PriceChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const { octPrice } = usePriceOracle();
   
   const priceDataRef = useRef<Array<{ time: number; value: number }>>([]);
+  const lastUpdateTimeRef = useRef<number>(0);
 
   // Track price history
   useEffect(() => {
     const now = Math.floor(Date.now() / 1000);
-    priceDataRef.current.push({ time: now, value: octPrice });
     
-    // Keep last 100 points
-    if (priceDataRef.current.length > 100) {
-      priceDataRef.current.shift();
+    // Only add if time has progressed
+    if (now > lastUpdateTimeRef.current) {
+      priceDataRef.current.push({ time: now, value: octPrice });
+      lastUpdateTimeRef.current = now;
+      
+      // Keep last 100 points
+      if (priceDataRef.current.length > 100) {
+        priceDataRef.current.shift();
+      }
     }
   }, [octPrice]);
 
@@ -59,13 +67,19 @@ export function PriceChart() {
 
     chartRef.current = chart;
 
-    // Update chart with price data
+    // Initialize with first data point
+    if (priceDataRef.current.length > 0) {
+      lineSeries.setData(
+        priceDataRef.current.map(d => ({ time: d.time as Time, value: d.value }))
+      );
+    }
+
+    // Update chart with new price data
     const updateChart = () => {
-      if (priceDataRef.current.length > 0) {
-        lineSeries.setData(
-          priceDataRef.current.map(d => ({ time: d.time as Time, value: d.value }))
-        );
-        chart.timeScale().fitContent();
+      const data = priceDataRef.current;
+      if (data.length > 0) {
+        const lastPoint = data[data.length - 1];
+        lineSeries.update({ time: lastPoint.time as Time, value: lastPoint.value });
       }
     };
 
