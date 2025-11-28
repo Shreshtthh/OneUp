@@ -48,6 +48,7 @@ export function Arena() {
   const duration = duel?.duration;
   const status = duel?.status ?? 0;
   const wagerAmount = duel?.wager;
+  const wagerInOct = wagerAmount ? BigInt(wagerAmount) : 0n;
 
   console.log('Duel state:', { 
     creator, 
@@ -116,16 +117,13 @@ export function Arena() {
     }
   }, [status, octPriceInCents, startingPrice, duelId]);
 
-  // Capture initial portfolio values
+  // Set initial balances to wager amount (both players start equal)
   useEffect(() => {
-    if (status === 1 && creatorPortfolio && opponentPortfolio && initialBalances.creator === 0n) {
-      console.log('📊 Capturing initial balances:', {
-        creator: creatorPortfolio.total,
-        opponent: opponentPortfolio.total
-      });
+    if (status === 1 && wagerInOct > 0n && initialBalances.creator === 0n) {
+      console.log('📊 Setting initial balances to wager amount:', wagerInOct);
       const initial = {
-        creator: creatorPortfolio.total,
-        opponent: opponentPortfolio.total
+        creator: wagerInOct,
+        opponent: wagerInOct
       };
       setInitialBalances(initial);
       localStorage.setItem(`duel-${duelId}-initial`, JSON.stringify({
@@ -133,7 +131,7 @@ export function Arena() {
         opponent: initial.opponent.toString()
       }));
     }
-  }, [status, creatorPortfolio, opponentPortfolio, initialBalances.creator, duelId]);
+  }, [status, wagerInOct, initialBalances.creator, duelId]);
 
   // Update countdown timer
   useEffect(() => {
@@ -168,9 +166,6 @@ export function Arena() {
   const isCreator = account?.address === creator;
   const isOpponent = account?.address === opponent;
   const isParticipant = isCreator || isOpponent;
-
-  // ✅ Calculate the wager in OCT (starting amount for both players)
-  const wagerInOct = wagerAmount ? BigInt(wagerAmount) : 0n;
 
   return (
     <div className="min-h-screen bg-gradient-game">
@@ -245,6 +240,19 @@ export function Arena() {
                   {formatOCT(wagerInOct)} OCT
                 </div>
               </div>
+              
+              {/* Show locked valuation price for active duels */}
+              {status === 1 && startingPrice > 0 && (
+                <div className="text-center mt-4 p-2 bg-black/30 rounded border border-gray-700">
+                  <div className="text-xs text-gray-400">Valuation Rate</div>
+                  <div className="text-sm font-mono text-ethereal-cyan">
+                    1 OCT = ${(startingPrice / 100).toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    (Portfolio scoring only)
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Opponent */}
