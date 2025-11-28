@@ -104,6 +104,9 @@ export function useOneChain() {
           duel.status = 2;
           duel.creatorScore = data.creator_score;
           duel.opponentScore = data.opponent_score;
+          duel.winner = data.winner;
+          duel.creatorEndValue = data.creator_end.toString();
+          duel.opponentEndValue = data.opponent_end.toString();
         }
       });
 

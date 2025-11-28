@@ -1,29 +1,34 @@
 import { useState } from 'react';
 import { GlassCard } from '../ui/GlassCard';
-import { NeonButton } from '../ui/NeonButton';
 import { useMockDex } from '../../hooks/useMockDex';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { useQuery } from '@tanstack/react-query';
 import { OCT_TYPE, MOCK_USD_TYPE } from '../../lib/constants';
+import toast from 'react-hot-toast';
+import { useDuel } from '../../hooks/useDuel';
 
 interface TradingPanelProps {
+  duelId: string;  // ✅ Pass duel ID
   octPrice: number;
   octPriceInCents: number;
 }
 
-export function TradingPanel({ octPrice, octPriceInCents }: TradingPanelProps) {
-  const [amount, setAmount] = useState('0.1');
+export function TradingPanel({ duelId, octPrice, octPriceInCents }: TradingPanelProps) {
   const [direction, setDirection] = useState<'oct-to-usd' | 'usd-to-oct'>('oct-to-usd');
+  const [amount, setAmount] = useState('0.01');
   const [isSwapping, setIsSwapping] = useState(false);
   
   const account = useCurrentAccount();
   const client = useSuiClient();
-    
+  const { data: duel } = useDuel(duelId); // ✅ Fetch duel data
   const { swapOctToUsd, swapUsdToOct } = useMockDex();
 
+  // ✅ Get wager in OCT (convert from MIST)
+  const wagerInOct = duel ? Number(duel.wager) / 1_000_000_000 : 0;
+
   // Fetch balances for the UI
-  const { data: balances, refetch } = useQuery({
-    queryKey: ['trading-balances', account?.address],
+  const { data: balances } = useQuery({
+    queryKey: ['player-balances', account?.address],
     queryFn: async () => {
       if (!account) return { oct: 0n, musd: 0n };
       
@@ -37,156 +42,159 @@ export function TradingPanel({ octPrice, octPriceInCents }: TradingPanelProps) {
       
       return { oct, musd };
     },
-    refetchInterval: 3000,
+    refetchInterval: 2000,
     enabled: !!account,
   });
 
+  const octBalance = balances ? Number(balances.oct) / 1_000_000_000 : 0;
+  const musdBalance = balances ? Number(balances.musd) / 1_000_000_000 : 0;
+
   const handleSwap = async () => {
+    if (!account) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    // ✅ Validate against wager amount
+    if (direction === 'oct-to-usd') {
+      const tradeAmount = Number(amount);
+      
+      if (tradeAmount > wagerInOct) {
+        toast.error(
+          `⚠️ Cannot trade more than wagered amount!\n` +
+          `Wagered: ${wagerInOct} OCT\n` +
+          `Attempting: ${tradeAmount} OCT\n\n` +
+          `You can only trade an amount less than or equal to the wagered amount for fairness.`
+        );
+        return;
+      }
+
+      if (tradeAmount > octBalance) {
+        toast.error('Insufficient OCT balance');
+        return;
+      }
+    }
+
     setIsSwapping(true);
     try {
       if (direction === 'oct-to-usd') {
         await swapOctToUsd(Number(amount), octPriceInCents);
+        toast.success(`✅ Swapped ${amount} OCT → USD`);
       } else {
         await swapUsdToOct(octPriceInCents);
+        toast.success('✅ Swapped USD → OCT');
       }
-      setAmount('0.1');
-      refetch(); // Update balances immediately
+      setAmount('0.01');
+    } catch (error: unknown) {
+      console.error('Swap failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Swap failed';
+      toast.error(errorMessage);
     } finally {
       setIsSwapping(false);
     }
   };
 
-  const octBalance = balances ? Number(balances.oct) / 1_000_000_000 : 0;
-  const musdBalance = balances ? Number(balances.musd) / 1_000_000 : 0;
-  const usdAmount = (Number(amount) * octPrice).toFixed(2);
-
   return (
     <GlassCard className="p-6" glow="purple">
-      <h3 className="text-xl font-bold text-gradient mb-6 flex items-center gap-2">
-        <span>🔄</span>
-        Trade
-      </h3>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">🔄</span>
+        <h3 className="text-xl font-bold text-white">Trade</h3>
+      </div>
 
-      {/* Live Price */}
-      <div className="mb-6 p-4 rounded-xl bg-black/30 border border-ethereal-cyan/20">
-        <div className="text-xs text-gray-400 mb-1">Live OCT Price</div>
-        <div className="text-3xl font-bold text-ethereal-cyan animate-pulse">
-          ${octPrice.toFixed(4)}
+      {/* ✅ Show wager info */}
+      <div className="bg-black/30 rounded-lg p-3 mb-4 border border-ethereal-cyan/20">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Wagered Amount:</span>
+          <span className="text-ethereal-cyan font-bold">{wagerInOct.toFixed(4)} OCT</span>
         </div>
+        <p className="text-xs text-gray-500 mt-2">
+          ℹ️ You can only trade up to the wagered amount for fairness
+        </p>
       </div>
 
-      {/* Direction Selector */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setDirection('oct-to-usd')}
-          className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-            direction === 'oct-to-usd'
-              ? 'bg-gradient-to-r from-ethereal-cyan to-ethereal-purple text-white shadow-glow-cyan'
-              : 'bg-black/30 text-gray-400 hover:bg-black/50'
-          }`}
-        >
-          OCT → USD
-        </button>
-        <button
-          onClick={() => setDirection('usd-to-oct')}
-          className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-            direction === 'usd-to-oct'
-              ? 'bg-gradient-to-r from-ethereal-purple to-ethereal-rose text-white shadow-glow-purple'
-              : 'bg-black/30 text-gray-400 hover:bg-black/50'
-          }`}
-        >
-          USD → OCT
-        </button>
-      </div>
+      <div className="space-y-4">
+        {/* Direction Toggle */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setDirection('oct-to-usd')}
+            className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
+              direction === 'oct-to-usd'
+                ? 'bg-ethereal-cyan text-black'
+                : 'bg-black/30 text-gray-400 hover:text-white'
+            }`}
+          >
+            OCT → USD
+          </button>
+          <button
+            onClick={() => setDirection('usd-to-oct')}
+            className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
+              direction === 'usd-to-oct'
+                ? 'bg-ethereal-purple text-black'
+                : 'bg-black/30 text-gray-400 hover:text-white'
+            }`}
+          >
+            USD → OCT
+          </button>
+        </div>
 
-      {/* Swap Interface */}
-      <div className="space-y-4 mb-6">
-        {direction === 'oct-to-usd' ? (
-          <>
-            {/* From: OCT */}
-            <div>
-              <label className="text-sm text-gray-400 block mb-2">You Send</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={octBalance}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-black/50 border border-gray-700 text-white focus:border-ethereal-cyan focus:outline-none transition-colors"
-                placeholder="0.00"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Available: {octBalance.toFixed(4)} OCT
-              </div>
+        {/* Live OCT Price */}
+        <div className="bg-black/30 rounded-lg p-4">
+          <div className="text-sm text-gray-400 mb-1">Live OCT Price</div>
+          <div className="text-3xl font-bold text-ethereal-cyan">
+            ${octPrice.toFixed(4)}
+          </div>
+        </div>
+
+        {/* Amount Input (OCT → USD only) */}
+        {direction === 'oct-to-usd' && (
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">
+              Amount (OCT)
+            </label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              max={wagerInOct}  // ✅ Set max to wager
+              step="0.001"
+              className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-ethereal-cyan focus:outline-none"
+              placeholder="0.01"
+            />
+            <div className="flex justify-between mt-2 text-xs text-gray-500">
+              <span>Balance: {octBalance.toFixed(4)} OCT</span>
+              <span>Max: {wagerInOct.toFixed(4)} OCT</span>
             </div>
-
-            <div className="text-center text-2xl text-ethereal-cyan">↓</div>
-
-            {/* To: USD */}
-            <div>
-              <label className="text-sm text-gray-400 block mb-2">You Receive</label>
-              <div className="w-full px-4 py-3 rounded-lg bg-black/50 border border-gray-700 text-ethereal-purple text-lg font-bold">
-                ${usdAmount}
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* From: USD */}
-            <div>
-              <label className="text-sm text-gray-400 block mb-2">You Send</label>
-              <div className="w-full px-4 py-3 rounded-lg bg-black/50 border border-gray-700 text-ethereal-purple text-lg font-bold">
-                All USD (${musdBalance.toFixed(2)})
-              </div>
-            </div>
-
-            <div className="text-center text-2xl text-ethereal-purple">↓</div>
-
-            {/* To: OCT */}
-            <div>
-              <label className="text-sm text-gray-400 block mb-2">You Receive</label>
-              <div className="w-full px-4 py-3 rounded-lg bg-black/50 border border-gray-700 text-ethereal-cyan text-lg font-bold">
-                ~{(musdBalance / octPrice).toFixed(4)} OCT
-              </div>
-            </div>
-          </>
+          </div>
         )}
-      </div>
 
-      {/* Swap Button */}
-      <NeonButton
-        onClick={handleSwap}
-        isLoading={isSwapping}
-        disabled={
-          isSwapping ||
-          (direction === 'oct-to-usd'
-            ? Number(amount) <= 0 || Number(amount) > octBalance
-            : musdBalance <= 0)
-        }
-        className="w-full"
-        variant="primary"
-      >
-        {direction === 'oct-to-usd' ? '🔄 Swap OCT → USD' : '🔄 Swap USD → OCT'}
-      </NeonButton>
-
-      {/* Portfolio Summary */}
-      <div className="mt-6 pt-6 border-t border-gray-700">
-        <div className="text-xs text-gray-400 mb-3">Your Portfolio</div>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-400">OCT:</span>
-            <span className="text-ethereal-cyan font-bold">{octBalance.toFixed(4)}</span>
+        {/* Balances */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-black/30 rounded-lg p-3">
+            <div className="text-xs text-gray-400">OCT Balance</div>
+            <div className="text-lg font-bold text-white">
+              {octBalance.toFixed(4)}
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">USD:</span>
-            <span className="text-ethereal-purple font-bold">${musdBalance.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between pt-2 border-t border-gray-700">
-            <span className="text-gray-300 font-medium">Total Value:</span>
-            <span className="text-white font-bold">${(octBalance * octPrice + musdBalance).toFixed(2)}</span>
+          <div className="bg-black/30 rounded-lg p-3">
+            <div className="text-xs text-gray-400">USD Balance</div>
+            <div className="text-lg font-bold text-white">
+              {musdBalance.toFixed(4)}
+            </div>
           </div>
         </div>
+
+        {/* Swap Button */}
+        <button
+          onClick={handleSwap}
+          disabled={isSwapping || !account}
+          className={`w-full py-3 rounded-lg font-bold transition ${
+            direction === 'oct-to-usd'
+              ? 'bg-gradient-to-r from-ethereal-cyan to-ethereal-purple hover:shadow-glow-cyan'
+              : 'bg-gradient-to-r from-ethereal-purple to-ethereal-rose hover:shadow-glow-purple'
+          } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          {isSwapping ? '⏳ Swapping...' : `Swap ${direction === 'oct-to-usd' ? 'OCT → USD' : 'USD → OCT'}`}
+        </button>
       </div>
     </GlassCard>
   );

@@ -17,18 +17,20 @@ export function Lobby() {
   const { activeDuels, refetchEvents } = useOneChain();
   const { joinDuel } = useDuelContract();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'open' | 'active'>('all');
+  const [filter, setFilter] = useState<'all' | 'open' | 'active' | 'resolved'>('all');
 
   const filteredDuels = activeDuels.filter((duel) => {
     if (filter === 'open') return duel.status === DUEL_STATUS.OPEN;
     if (filter === 'active') return duel.status === DUEL_STATUS.ACTIVE;
-    return duel.status !== DUEL_STATUS.RESOLVED;
+    if (filter === 'resolved') return duel.status === DUEL_STATUS.RESOLVED;
+    return true; // Show all duels including resolved ones
   });
 
   const stats = {
     totalDuels: activeDuels.length,
     activeBattles: activeDuels.filter(d => d.status === DUEL_STATUS.ACTIVE).length,
     openChallenges: activeDuels.filter(d => d.status === DUEL_STATUS.OPEN).length,
+    resolvedDuels: activeDuels.filter(d => d.status === DUEL_STATUS.RESOLVED).length,
   };
 
   const handleJoin = async (duel: Duel) => {
@@ -80,11 +82,12 @@ export function Lobby() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
           {[
             { label: 'Total Duels', value: stats.totalDuels, color: '#00f0ff' },
             { label: 'Active Battles', value: stats.activeBattles, color: '#00ff00' },
             { label: 'Open Challenges', value: stats.openChallenges, color: '#ff00ff' },
+            { label: 'Past Duels', value: stats.resolvedDuels, color: '#ffa500' },
           ].map((stat, idx) => (
             <div
               key={idx}
@@ -108,10 +111,11 @@ export function Lobby() {
             { label: 'All', value: 'all' },
             { label: 'Open', value: 'open' },
             { label: 'Active', value: 'active' },
+            { label: 'Past Duels', value: 'resolved' },
           ].map((tab) => (
             <button
               key={tab.value}
-              onClick={() => setFilter(tab.value as any)}
+              onClick={() => setFilter(tab.value as 'all' | 'open' | 'active' | 'resolved')}
               className="px-6 py-2 rounded-lg font-medium transition-all duration-300"
               style={{
                 background: filter === tab.value

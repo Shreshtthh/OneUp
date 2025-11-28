@@ -8,6 +8,9 @@ export interface Duel {
   status: number;
   creatorScore?: number;
   opponentScore?: number;
+  winner?: string;
+  creatorEndValue?: string;
+  opponentEndValue?: string;
 }
 
 export interface DuelEvent {
@@ -21,4 +24,8 @@ export interface DuelEvent {
   winner?: string;
   creator_score?: number;
   opponent_score?: number;
+  creator_start?: string;
+  creator_end?: string;
+  opponent_start?: string;
+  opponent_end?: string;
 }

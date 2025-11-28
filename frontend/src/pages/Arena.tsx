@@ -11,6 +11,7 @@ import { PriceChart } from '../components/arena/PriceChart';
 import { formatTimeRemaining, formatAddress, formatOCT } from '../lib/utils';
 import { OCT_TYPE, MOCK_USD_TYPE } from '../lib/constants';
 import { usePriceOracle } from '../hooks/usePriceOracle';
+import { useDuel } from '../hooks/useDuel';
 
 
 export function Arena() {
@@ -19,43 +20,34 @@ export function Arena() {
   const account = useCurrentAccount();
   const client = useSuiClient();
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [startingPrice, setStartingPrice] = useState<number>(() => {
+    // Try to load from localStorage
+    const stored = localStorage.getItem(`duel-${duelId}-price`);
+    return stored ? Number(stored) : 0;
+  });
+  const [initialBalances, setInitialBalances] = useState<{
+    creator: bigint;
+    opponent: bigint;
+  }>(() => {
+    const stored = localStorage.getItem(`duel-${duelId}-initial`);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return { creator: BigInt(parsed.creator), opponent: BigInt(parsed.opponent) };
+    }
+    return { creator: 0n, opponent: 0n };
+  });
   const { octPrice, octPriceInCents } = usePriceOracle();
 
-  // Fetch duel object
-  const { data: duel, isLoading } = useQuery({
-    queryKey: ['duel', duelId],
-    queryFn: async () => {
-      if (!duelId) return null;
-      const result = await client.getObject({
-        id: duelId,
-        options: { showContent: true },
-      });
-      
-      console.log('Duel data:', result); // ✅ Keep this for debugging
-      return result;
-    },
-    refetchInterval: 2000,
-    enabled: !!duelId,
-  });
+  // ✅ Use the useDuel hook instead of duplicate query
+  const { data: duel, isLoading } = useDuel(duelId || '');
 
-  const fields = (duel?.data?.content as {
-    fields?: {
-      creator?: string;
-      opponent?: { vec?: string[] } | string;
-      start_time?: { vec?: number[] } | number;
-      duration?: number;
-      status?: number;
-      wager_amount?: string;
-    }
-  })?.fields;
-
-  // ✅ Works whether wrapped in Option or not
-  const creator = fields?.creator;
-  const opponent = (fields?.opponent as { vec?: string[] })?.vec?.[0] || (fields?.opponent as string) || null;
-  const startTime = (fields?.start_time as { vec?: number[] })?.vec?.[0] || (fields?.start_time as number) || null;
-  const duration = fields?.duration;
-  const status = fields?.status ?? 0;
-  const wagerAmount = fields?.wager_amount;
+  // ✅ Extract fields directly from useDuel data
+  const creator = duel?.creator;
+  const opponent = duel?.opponent;
+  const startTime = duel?.startTime;
+  const duration = duel?.duration;
+  const status = duel?.status ?? 0;
+  const wagerAmount = duel?.wager;
 
   console.log('Duel state:', { 
     creator, 
@@ -78,27 +70,70 @@ export function Arena() {
     const oct = octCoins.data.reduce((sum, coin) => sum + BigInt(coin.balance), 0n);
     const musd = musdCoins.data.reduce((sum, coin) => sum + BigInt(coin.balance), 0n);
     
-    // For the Chart & Header:
-    // We assume a rough price of $1.50 per OCT to unify the value for display
-    // (In a production app, we would pass the Oracle Price here)
-    const musdInOct = (musd * 1000n) / 1500n; 
+    // ✅ Convert USD to OCT using FIXED starting price (not live price)
+    // This ensures portfolio value only changes from trades, not market volatility
+    const priceToUse = startingPrice > 0 ? startingPrice : octPriceInCents;
+    const musdInOct = priceToUse > 0 
+      ? (musd * BigInt(Math.floor(priceToUse))) / 100n 
+      : 0n;
+    
+    console.log('📊 Portfolio calc:', { 
+      address: address?.slice(0, 8), 
+      oct: Number(oct), 
+      musd: Number(musd), 
+      priceUsed: priceToUse,
+      startingPrice,
+      musdInOct: Number(musdInOct)
+    });
     
     return { oct, musd, total: oct + musdInOct };
   };
 
   const { data: creatorPortfolio } = useQuery({
-    queryKey: ['portfolio', creator],
+    queryKey: ['portfolio', creator, startingPrice],
     queryFn: () => fetchPortfolio(creator),
-    refetchInterval: 3000,
-    enabled: !!creator,
+    refetchInterval: 2000,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always fetch fresh data
+    enabled: !!creator && (status !== 1 || startingPrice > 0), // Wait for price lock if duel is active
   });
 
   const { data: opponentPortfolio } = useQuery({
-    queryKey: ['portfolio', opponent],
+    queryKey: ['portfolio', opponent, startingPrice],
     queryFn: () => fetchPortfolio(opponent || undefined),
-    refetchInterval: 3000,
-    enabled: !!opponent,
+    refetchInterval: 2000,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always fetch fresh data
+    enabled: !!opponent && (status !== 1 || startingPrice > 0), // Wait for price lock if duel is active
   });
+
+  // Capture starting price and initial balances when duel starts
+  useEffect(() => {
+    if (status === 1 && octPriceInCents > 0 && startingPrice === 0) {
+      console.log('🔒 Locking starting price:', octPriceInCents);
+      setStartingPrice(octPriceInCents);
+      localStorage.setItem(`duel-${duelId}-price`, String(octPriceInCents));
+    }
+  }, [status, octPriceInCents, startingPrice, duelId]);
+
+  // Capture initial portfolio values
+  useEffect(() => {
+    if (status === 1 && creatorPortfolio && opponentPortfolio && initialBalances.creator === 0n) {
+      console.log('📊 Capturing initial balances:', {
+        creator: creatorPortfolio.total,
+        opponent: opponentPortfolio.total
+      });
+      const initial = {
+        creator: creatorPortfolio.total,
+        opponent: opponentPortfolio.total
+      };
+      setInitialBalances(initial);
+      localStorage.setItem(`duel-${duelId}-initial`, JSON.stringify({
+        creator: initial.creator.toString(),
+        opponent: initial.opponent.toString()
+      }));
+    }
+  }, [status, creatorPortfolio, opponentPortfolio, initialBalances.creator, duelId]);
 
   // Update countdown timer
   useEffect(() => {
@@ -118,7 +153,7 @@ export function Arena() {
     );
   }
 
-  if (!duel || !duel.data) {
+  if (!duel) {
     return (
       <div className="min-h-screen bg-gradient-game flex items-center justify-center">
         <GlassCard className="p-12 text-center">
@@ -133,6 +168,9 @@ export function Arena() {
   const isCreator = account?.address === creator;
   const isOpponent = account?.address === opponent;
   const isParticipant = isCreator || isOpponent;
+
+  // ✅ Calculate the wager in OCT (starting amount for both players)
+  const wagerInOct = wagerAmount ? BigInt(wagerAmount) : 0n;
 
   return (
     <div className="min-h-screen bg-gradient-game">
@@ -158,11 +196,34 @@ export function Arena() {
               </div>
               <div className="text-sm text-gray-400">Creator</div>
               <div className="text-ethereal-cyan font-mono text-lg">{formatAddress(creator || '')}</div>
-              {creatorPortfolio && (
+              {creatorPortfolio && initialBalances.creator > 0n && (
                 <div className="mt-2 text-center">
+                  {/* Current Value */}
                   <div className="text-2xl font-bold text-white">{formatOCT(creatorPortfolio.total)} OCT</div>
                   <div className="text-xs text-gray-400">
-                    {formatOCT(creatorPortfolio.oct)} OCT + {(Number(creatorPortfolio.musd) / 1_000_000).toFixed(2)} USD
+                    {formatOCT(creatorPortfolio.oct)} OCT + {(Number(creatorPortfolio.musd) / 1_000_000_000).toFixed(4)} USD
+                  </div>
+                  
+                  {/* Starting Balance */}
+                  <div className="text-xs text-gray-500 mt-2 border-t border-gray-700 pt-2">
+                    Started with: {formatOCT(initialBalances.creator)} OCT
+                  </div>
+                  
+                  {/* Profit/Loss */}
+                  <div className={`text-sm font-bold mt-1 ${
+                    creatorPortfolio.total > initialBalances.creator ? 'text-green-400' : 
+                    creatorPortfolio.total < initialBalances.creator ? 'text-red-400' : 'text-gray-400'
+                  }`}>
+                    {creatorPortfolio.total > initialBalances.creator ? '↑' : 
+                     creatorPortfolio.total < initialBalances.creator ? '↓' : '='} 
+                    {formatOCT(creatorPortfolio.total > initialBalances.creator 
+                      ? creatorPortfolio.total - initialBalances.creator 
+                      : initialBalances.creator - creatorPortfolio.total)} OCT
+                  </div>
+                  
+                  {/* ROI */}
+                  <div className="text-xs text-ethereal-cyan mt-1">
+                    ROI: {((Number(creatorPortfolio.total - initialBalances.creator) / Number(initialBalances.creator)) * 100).toFixed(2)}%
                   </div>
                 </div>
               )}
@@ -177,6 +238,13 @@ export function Arena() {
                   <div className="text-2xl font-bold text-ethereal-rose">{timeRemaining}</div>
                 </div>
               )}
+              {/* ✅ Show starting wager */}
+              <div className="text-center mt-4">
+                <div className="text-xs text-gray-400">Wager</div>
+                <div className="text-lg font-bold text-ethereal-gold">
+                  {formatOCT(wagerInOct)} OCT
+                </div>
+              </div>
             </div>
 
             {/* Opponent */}
@@ -188,11 +256,34 @@ export function Arena() {
                   </div>
                   <div className="text-sm text-gray-400">Challenger</div>
                   <div className="text-ethereal-purple font-mono text-lg">{formatAddress(opponent)}</div>
-                  {opponentPortfolio && (
+                  {opponentPortfolio && initialBalances.opponent > 0n && (
                     <div className="mt-2 text-center">
+                      {/* Current Value */}
                       <div className="text-2xl font-bold text-white">{formatOCT(opponentPortfolio.total)} OCT</div>
                       <div className="text-xs text-gray-400">
-                        {formatOCT(opponentPortfolio.oct)} OCT + {(Number(opponentPortfolio.musd) / 1_000_000).toFixed(2)} USD
+                        {formatOCT(opponentPortfolio.oct)} OCT + {(Number(opponentPortfolio.musd) / 1_000_000_000).toFixed(4)} USD
+                      </div>
+                      
+                      {/* Starting Balance */}
+                      <div className="text-xs text-gray-500 mt-2 border-t border-gray-700 pt-2">
+                        Started with: {formatOCT(initialBalances.opponent)} OCT
+                      </div>
+                      
+                      {/* Profit/Loss */}
+                      <div className={`text-sm font-bold mt-1 ${
+                        opponentPortfolio.total > initialBalances.opponent ? 'text-green-400' : 
+                        opponentPortfolio.total < initialBalances.opponent ? 'text-red-400' : 'text-gray-400'
+                      }`}>
+                        {opponentPortfolio.total > initialBalances.opponent ? '↑' : 
+                         opponentPortfolio.total < initialBalances.opponent ? '↓' : '='} 
+                        {formatOCT(opponentPortfolio.total > initialBalances.opponent 
+                          ? opponentPortfolio.total - initialBalances.opponent 
+                          : initialBalances.opponent - opponentPortfolio.total)} OCT
+                      </div>
+                      
+                      {/* ROI */}
+                      <div className="text-xs text-ethereal-purple mt-1">
+                        ROI: {((Number(opponentPortfolio.total - initialBalances.opponent) / Number(initialBalances.opponent)) * 100).toFixed(2)}%
                       </div>
                     </div>
                   )}
@@ -219,16 +310,21 @@ export function Arena() {
                 <PriceChart octPrice={octPrice} />
               </div>
               <div>
-                <TradingPanel octPrice={octPrice} octPriceInCents={octPriceInCents} />
+                <TradingPanel 
+                  duelId={duelId!}
+                  octPrice={octPrice} 
+                  octPriceInCents={octPriceInCents} 
+                />
               </div>
             </div>
 
             {/* Portfolio Performance Chart */}
             <DuelChart
+              duelId={duelId!}
               creatorBalance={creatorPortfolio?.total || 0n}
               opponentBalance={opponentPortfolio?.total || 0n}
-              creatorStartBalance={wagerAmount ? BigInt(wagerAmount) : 0n}
-              opponentStartBalance={wagerAmount ? BigInt(wagerAmount) : 0n}
+              creatorInitial={initialBalances.creator}
+              opponentInitial={initialBalances.opponent}
             />
           </div>
         )}
@@ -236,10 +332,11 @@ export function Arena() {
         {/* Chart only (no trading) - For spectators */}
         {status === 1 && !isParticipant && creatorPortfolio && opponentPortfolio && (
           <DuelChart
+            duelId={duelId!}
             creatorBalance={creatorPortfolio.total}
             opponentBalance={opponentPortfolio.total}
-            creatorStartBalance={wagerAmount ? BigInt(wagerAmount) : 0n}
-            opponentStartBalance={wagerAmount ? BigInt(wagerAmount) : 0n}
+            creatorInitial={initialBalances.creator}
+            opponentInitial={initialBalances.opponent}
           />
         )}
 
@@ -251,7 +348,7 @@ export function Arena() {
               Waiting for Opponent...
             </h3>
             <p className="text-gray-400 text-lg">
-              Wager: <span className="text-ethereal-cyan font-bold">{Number(wagerAmount) / 1_000_000_000} OCT</span>
+              Wager: <span className="text-ethereal-cyan font-bold">{formatOCT(wagerInOct)} OCT</span>
             </p>
           </GlassCard>
         )}
@@ -281,6 +378,12 @@ export function Arena() {
                     <div className="text-ethereal-cyan mt-2">
                       {formatAddress(creator || '')}
                     </div>
+                    {/* ✅ Show final ROI */}
+                    <div className="text-sm text-gray-400 mt-2">
+                      ROI: {initialBalances.creator > 0n 
+                        ? ((Number(creatorPortfolio.total - initialBalances.creator) / Number(initialBalances.creator)) * 100).toFixed(2)
+                        : '0.00'}%
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="text-sm text-gray-400">Opponent</div>
@@ -293,6 +396,12 @@ export function Arena() {
                     </div>
                     <div className="text-ethereal-purple mt-2">
                       {formatAddress(opponent || '')}
+                    </div>
+                    {/* ✅ Show final ROI */}
+                    <div className="text-sm text-gray-400 mt-2">
+                      ROI: {initialBalances.opponent > 0n 
+                        ? ((Number(opponentPortfolio.total - initialBalances.opponent) / Number(initialBalances.opponent)) * 100).toFixed(2)
+                        : '0.00'}%
                     </div>
                   </div>
                 </div>
@@ -311,10 +420,13 @@ export function Arena() {
           <GlassCard className="mt-8 p-6 border-ethereal-purple/30">
             <h4 className="text-lg font-bold text-ethereal-purple mb-3">📊 How to Play (Demo Mode)</h4>
             <div className="text-sm text-gray-300 space-y-2">
+              <p>• Both players start with <strong>{formatOCT(wagerInOct)} OCT</strong> (the wagered amount).</p>
+              <p>• You can only trade <strong>up to the wagered amount</strong> for fairness.</p>
               <p>• Use the trading panel to swap <strong>OCT ↔ MOCK USD</strong>.</p>
               <p>• Prices are fetched live from the real market (SUI/USD proxy).</p>
-              <p>• Your portfolio value = OCT balance + USD value (converted to OCT).</p>
+              <p>• Your ROI is calculated as: <strong>(Current Value - Wager) / Wager × 100%</strong></p>
               <p>• <strong>Strategy:</strong> Swap to USD if you think price will drop. Swap back to OCT if you think price will rise.</p>
+              <p>• <strong>Winner:</strong> Player with highest portfolio value at the end wins the entire pot!</p>
             </div>
           </GlassCard>
         )}

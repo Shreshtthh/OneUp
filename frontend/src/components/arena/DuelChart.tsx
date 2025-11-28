@@ -4,18 +4,21 @@ import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { GlassCard } from '../ui/GlassCard';
 
 interface DuelChartProps {
+  duelId: string;
   creatorBalance: bigint;
   opponentBalance: bigint;
-  creatorStartBalance: bigint;
-  opponentStartBalance: bigint;
+  creatorInitial: bigint;
+  opponentInitial: bigint;
 }
 
 export function DuelChart({ 
   creatorBalance, 
-  opponentBalance, 
-  creatorStartBalance, 
-  opponentStartBalance 
+  opponentBalance,
+  creatorInitial,
+  opponentInitial,
 }: DuelChartProps) {
+  const creatorStake = creatorInitial;
+  const opponentStake = opponentInitial;
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const creatorSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -23,10 +26,10 @@ export function DuelChart({
   const lastUpdateRef = useRef<Time>(0 as Time); // ✅ Track last update time
 
   // Helper: Calculate ROI %
-  const getRoi = (current: bigint, start: bigint) => {
-    if (start === 0n) return 0;
-    const diff = current - start;
-    return Number((diff * 10000n) / start) / 100; 
+  const getRoi = (current: bigint, stake: bigint) => {
+    if (stake === 0n) return 0;
+    const diff = current - stake;
+    return Number((diff * 10000n) / stake) / 100; 
   };
 
   useEffect(() => {
@@ -73,8 +76,8 @@ export function DuelChart({
     const now = Math.floor(Date.now() / 1000) as Time;
     lastUpdateRef.current = now;
 
-    const initialRoiCreator = getRoi(creatorBalance, creatorStartBalance);
-    const initialRoiOpponent = getRoi(opponentBalance, opponentStartBalance);
+    const initialRoiCreator = getRoi(creatorBalance, creatorStake);
+    const initialRoiOpponent = getRoi(opponentBalance, opponentStake);
 
     creatorSeries.setData([{ time: now, value: initialRoiCreator }]);
     opponentSeries.setData([{ time: now, value: initialRoiOpponent }]);
@@ -107,8 +110,8 @@ export function DuelChart({
       return; // Skip update if less than 2 seconds
     }
 
-    const creatorRoi = getRoi(creatorBalance, creatorStartBalance);
-    const opponentRoi = getRoi(opponentBalance, opponentStartBalance);
+    const creatorRoi = getRoi(creatorBalance, creatorStake);
+    const opponentRoi = getRoi(opponentBalance, opponentStake);
 
     // Update chart
     creatorSeriesRef.current.update({ time: now as Time, value: creatorRoi });
@@ -116,10 +119,10 @@ export function DuelChart({
     
     lastUpdateRef.current = now as Time; // ✅ Update last time
     
-  }, [creatorBalance, opponentBalance, creatorStartBalance, opponentStartBalance]);
+  }, [creatorBalance, opponentBalance, creatorStake, opponentStake]);
 
-  const currentCreatorRoi = getRoi(creatorBalance, creatorStartBalance);
-  const currentOpponentRoi = getRoi(opponentBalance, opponentStartBalance);
+  const currentCreatorRoi = getRoi(creatorBalance, creatorStake);
+  const currentOpponentRoi = getRoi(opponentBalance, opponentStake);
 
   return (
     <GlassCard className="p-6" glow="cyan">
