@@ -117,13 +117,13 @@ export function Arena() {
     }
   }, [status, octPriceInCents, startingPrice, duelId]);
 
-  // Set initial balances to wager amount (both players start equal)
+  // Capture actual starting portfolio values when duel becomes active
   useEffect(() => {
-    if (status === 1 && wagerInOct > 0n && initialBalances.creator === 0n) {
-      console.log('📊 Setting initial balances to wager amount:', wagerInOct);
+    if (status === 1 && creatorPortfolio && opponentPortfolio && initialBalances.creator === 0n) {
+      console.log('📊 Capturing actual starting balances from portfolios');
       const initial = {
-        creator: wagerInOct,
-        opponent: wagerInOct
+        creator: creatorPortfolio.total,
+        opponent: opponentPortfolio.total
       };
       setInitialBalances(initial);
       localStorage.setItem(`duel-${duelId}-initial`, JSON.stringify({
@@ -131,7 +131,7 @@ export function Arena() {
         opponent: initial.opponent.toString()
       }));
     }
-  }, [status, wagerInOct, initialBalances.creator, duelId]);
+  }, [status, creatorPortfolio, opponentPortfolio, initialBalances.creator, duelId]);
 
   // Update countdown timer
   useEffect(() => {
