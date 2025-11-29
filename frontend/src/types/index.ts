@@ -11,6 +11,13 @@ export interface Duel {
   winner?: string;
   creatorEndValue?: string;
   opponentEndValue?: string;
+  finalResults?: {
+    creatorEnd: bigint;
+    opponentEnd: bigint;
+    winner: string;
+    creatorScore: number;
+    opponentScore: number;
+  };
 }
 
 export interface DuelEvent {
