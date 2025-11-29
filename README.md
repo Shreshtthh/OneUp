@@ -9,6 +9,10 @@
 
 Instead of passive staking, players enter a "Duel," lock a wager, and compete to achieve the highest **Return on Investment (ROI)** within a set time limit using a simulated trading environment.
 
+Live- https://one-up-puce.vercel.app/
+
+Video demo- https://youtu.be/s1qY5Gs_bCo?si=OhLGEtXJKAu1GzxE
+
 ### 🏆 The Vision
 OneChain is built for speed and finance. OneUp leverages OneChain's near-instant finality to create a trading experience that feels like a competitive eSport. We aren't just trading tokens; we are gamifying market volatility.
 
