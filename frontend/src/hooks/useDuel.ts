@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSuiClient } from '@mysten/dapp-kit';
+import { PACKAGE_ID } from '../lib/constants';
 
 export function useDuel(duelId: string) {
   const client = useSuiClient();
@@ -33,15 +34,61 @@ export function useDuel(duelId: string) {
       const wagerValue = (fields.wager_amount || fields.wager) as string || '0';
       console.log('useDuel: Extracted wager value:', wagerValue);
       
+      const status = Number(fields.status);
+      let finalResults = null;
+
+      // ✅ FIX: If resolved (status === 2), fetch the resolution event
+      // This prevents prize payout from polluting ROI calculations
+      if (status === 2) {
+        console.log('🏆 Duel is resolved, fetching DuelResolved event...');
+        const events = await client.queryEvents({
+          query: { 
+            MoveEventType: `${PACKAGE_ID}::duel::DuelResolved` 
+          },
+          limit: 50,
+          order: 'descending'
+        });
+
+        console.log('📡 Found', events.data.length, 'DuelResolved events');
+        
+        interface DuelResolvedEvent {
+          duel_id: string;
+          winner: string;
+          creator_end: string;
+          opponent_end: string;
+          creator_score: number;
+          opponent_score: number;
+        }
+        
+        const resolutionEvent = events.data.find(
+          (e) => (e.parsedJson as DuelResolvedEvent).duel_id === duelId
+        );
+
+        if (resolutionEvent) {
+          const payload = resolutionEvent.parsedJson as DuelResolvedEvent;
+          console.log('✅ Found resolution event:', payload);
+          finalResults = {
+            creatorEnd: BigInt(payload.creator_end),
+            opponentEnd: BigInt(payload.opponent_end),
+            winner: payload.winner,
+            creatorScore: Number(payload.creator_score),
+            opponentScore: Number(payload.opponent_score)
+          };
+        } else {
+          console.warn('⚠️ No resolution event found for duel:', duelId);
+        }
+      }
+      
       const result = {
         id: duelId,
         creator: fields.creator as string,
         opponent: (fields.opponent as { vec?: string[] })?.vec?.[0] || (fields.opponent as string) || null,
         startTime: (fields.start_time as { vec?: number[] })?.vec?.[0] || (fields.start_time as number) || null,
         duration: Number(fields.duration),
-        status: Number(fields.status),
-        wager: wagerValue, // ✅ Try both field names
+        status: status,
+        wager: wagerValue,
         winner: (fields.winner as { vec?: string[] })?.vec?.[0] || null,
+        finalResults // ✅ Return this new field with pre-payout balances
       };
       
       console.log('useDuel: Returning duel data:', result);
